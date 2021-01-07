@@ -27,16 +27,16 @@ def detection(frame):
     #if ((classes == ()) == False)
     if(len(classes) != 0):
         for classId, confidence, box in zip(classes.flatten(), confidences.flatten(), boxes):
-            # label = '%.2f' % confidence
-            # label = '%s: %s' % (names[classId], label)
-            # labelSize, baseLine = cv2.getTextSize(label,cv2.FONT_HERSHEY_SIMPLEX, 0.5,1)
+            label = '%.2f' % confidence
+            label = '%s: %s' % (names[classId], label)
+            labelSize, baseLine = cv2.getTextSize(label,cv2.FONT_HERSHEY_SIMPLEX, 0.5,1)
             left, top, width, height = box
 
             #xmin, ymin, xmax, ymax = convertBack(float(left),float(top),float(width),float(height))
 
             # cv2.rectangle(frame,box,color=(0,255,0), thickness=3)
-            # cv2.rectangle(frame,(left, top-labelSize[1]),(left+labelSize[0],top+baseLine),(255,255,255),cv2.FILLED)
-            # cv2.putText(frame,label,(left, top), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
+            cv2.rectangle(frame,(left, top-labelSize[1]),(left+labelSize[0],top+baseLine),(255,255,255),cv2.FILLED)
+            cv2.putText(frame,label,(left, top), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
             centroid_dict[objId] = (left, top, width, height)
             objId+=1
 
@@ -45,7 +45,7 @@ def detection(frame):
         for (id1, p1), (id2, p2) in combinations(centroid_dict.items(), 2):
             dx, dy = ((int(p1[0])-int(p2[0]))**2), ((int(p1[1])-int(p2[1]))**2)
             distance = is_close(dx, dy)
-            print(id1,id2, distance)
+            # print(id1,id2, distance)
             if distance < 75.0:
                 if id1 not in red_zone_list:
                     red_zone_list.append(id1)  
@@ -54,9 +54,9 @@ def detection(frame):
 
         for idx, box in centroid_dict.items():
             if idx in red_zone_list:
-                cv2.rectangle(frame, (box[0],box[1],box[2],box[3]), (0, 0, 255), 3)
+                cv2.rectangle(frame, (box[0],box[1],box[2],box[3]), (0, 0, 255), 2)
             else:
-                cv2.rectangle(frame, (box[0],box[1],box[2],box[3]), (0, 255, 0), 3)
+                cv2.rectangle(frame, (box[0],box[1],box[2],box[2]), (0, 255, 0), 3)
 
 
 
@@ -82,7 +82,7 @@ class ThreadedCamera(object):
             time.sleep(self.FPS)
 
     def show_frame(self):
-        frame = rescaleFrame(self.frame,.2)
+        frame = rescaleFrame(self.frame,.5)
         detection(frame)
         cv2.imshow('frame', frame)
         cv2.waitKey(self.FPS_MS)
@@ -90,7 +90,7 @@ class ThreadedCamera(object):
 
 def vid():
     if __name__ == '__main__':
-        src = 'video.mp4'
+        src = 'Testing/vid.mp4'
         threaded_camera = ThreadedCamera(src)
         while True:
             try:
@@ -129,11 +129,11 @@ def convertBack(x, y, w, h):
 
 
 def im():
-    image = cv2.imread('breast.jpg')
+    image = cv2.imread('Testing/Picture3.png')
     image = rescaleFrame(image)
     detection(image)
     cv2.imshow('Image', image)
     cv2.waitKey(0)
 
-im()
-# vid()
+# im()
+vid()
