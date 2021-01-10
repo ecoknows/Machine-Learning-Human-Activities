@@ -29,15 +29,15 @@ def detection(frame):
         for classId, confidence, box in zip(classes.flatten(), confidences.flatten(), boxes):
             label = '%.2f' % confidence
             label = '%s: %s' % (names[classId], label)
-            labelSize, baseLine = cv2.getTextSize(label,cv2.FONT_HERSHEY_SIMPLEX, 0.5,1)
+            # labelSize, baseLine = cv2.getTextSize(label,cv2.FONT_HERSHEY_SIMPLEX, 0.5,1)
             left, top, width, height = box
 
             #xmin, ymin, xmax, ymax = convertBack(float(left),float(top),float(width),float(height))
 
             # cv2.rectangle(frame,box,color=(0,255,0), thickness=3)
-            cv2.rectangle(frame,(left, top-labelSize[1]),(left+labelSize[0],top+baseLine),(255,255,255),cv2.FILLED)
-            cv2.putText(frame,label,(left, top), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
-            centroid_dict[objId] = (left, top, width, height)
+            # cv2.rectangle(frame,(left, top-labelSize[1]),(left+labelSize[0],top+baseLine),(255,255,255),cv2.FILLED)
+            # cv2.putText(frame,label,(left, top), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
+            centroid_dict[objId] = (left, top, width, height,label)
             objId+=1
 
         red_zone_list = [] 
@@ -54,9 +54,17 @@ def detection(frame):
 
         for idx, box in centroid_dict.items():
             if idx in red_zone_list:
+                label = box[4] +  ' [ At Risk ]'
+                labelSize, baseLine = cv2.getTextSize(label,cv2.FONT_HERSHEY_SIMPLEX, 0.5,1)
                 cv2.rectangle(frame, (box[0],box[1],box[2],box[3]), (0, 0, 255), 2)
+                cv2.rectangle(frame,(box[0], box[1]-labelSize[1]),(box[0]+labelSize[0],box[1]+baseLine),(255,255,255),cv2.FILLED)
+                cv2.putText(frame,label,(box[0], box[1]), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
             else:
-                cv2.rectangle(frame, (box[0],box[1],box[2],box[2]), (0, 255, 0), 3)
+                label = box[4] +  ' [ Safe ]'
+                labelSize, baseLine = cv2.getTextSize(label,cv2.FONT_HERSHEY_SIMPLEX, 0.5,1)
+                cv2.rectangle(frame, (box[0],box[1],box[2],box[3]), (0, 255, 0), 2)
+                cv2.rectangle(frame,(box[0], box[1]-labelSize[1]),(box[0]+labelSize[0],box[1]+baseLine),(255,255,255),cv2.FILLED)
+                cv2.putText(frame,label,(box[0], box[1]), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
 
 
 
@@ -67,7 +75,7 @@ class ThreadedCamera(object):
 
         # FPS = 1/X
         # X = desired FPS
-        self.FPS = 1/120
+        self.FPS = 1/30
         self.FPS_MS = int(self.FPS * 1000)
 
         # Start frame retrieval thread
@@ -82,7 +90,7 @@ class ThreadedCamera(object):
             time.sleep(self.FPS)
 
     def show_frame(self):
-        frame = rescaleFrame(self.frame,.5)
+        frame = rescaleFrame(self.frame, .7)
         detection(frame)
         cv2.imshow('frame', frame)
         cv2.waitKey(self.FPS_MS)
@@ -90,7 +98,7 @@ class ThreadedCamera(object):
 
 def vid():
     if __name__ == '__main__':
-        src = 'Testing/vid.mp4'
+        src = 'Testing/video1.mp4'
         threaded_camera = ThreadedCamera(src)
         while True:
             try:
@@ -130,7 +138,7 @@ def convertBack(x, y, w, h):
 
 def im():
     image = cv2.imread('Testing/Picture3.png')
-    image = rescaleFrame(image)
+    image = rescaleFrame(image,1.5)
     detection(image)
     cv2.imshow('Image', image)
     cv2.waitKey(0)
