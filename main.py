@@ -3,7 +3,7 @@ import cv2, time
 from itertools import combinations
 import math
 
-net = cv2.dnn_DetectionModel('yolov4.cfg','yolov4.weights')
+net = cv2.dnn_DetectionModel('final.cfg','final.weights')
 net.setInputSize(416,416)
 net.setInputScale(1 / 255)
 net.setInputSwapRB(True)
@@ -29,35 +29,44 @@ def detection(frame):
         for classId, confidence, box in zip(classes.flatten(), confidences.flatten(), boxes):
             label = '%.2f' % confidence
             label = '%s: %s' % (names[classId], label)
-            labelSize, baseLine = cv2.getTextSize(label,cv2.FONT_HERSHEY_SIMPLEX, 0.5,1)
+            # labelSize, baseLine = cv2.getTextSize(label,cv2.FONT_HERSHEY_SIMPLEX, 0.5,1)
             left, top, width, height = box
 
-            #xmin, ymin, xmax, ymax = convertBack(float(left),float(top),float(width),float(height))
+            xmin, ymin, xmax, ymax = convertBack(float(left),float(top),float(width),float(height))
 
             # cv2.rectangle(frame,box,color=(0,255,0), thickness=3)
-            cv2.rectangle(frame,(left, top-labelSize[1]),(left+labelSize[0],top+baseLine),(255,255,255),cv2.FILLED)
-            cv2.putText(frame,label,(left, top), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
-            centroid_dict[objId] = (left, top, width, height)
+            # cv2.rectangle(frame,(left, top-labelSize[1]),(left+labelSize[0],top+baseLine),(255,255,255),cv2.FILLED)
+            # cv2.putText(frame,label,(left, top), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
+            centroid_dict[objId] = (left, top, width, height,label )
             objId+=1
 
         red_zone_list = [] 
-        red_line_list = []
         for (id1, p1), (id2, p2) in combinations(centroid_dict.items(), 2):
             dx, dy = ((int(p1[0])-int(p2[0]))**2), ((int(p1[1])-int(p2[1]))**2)
             distance = is_close(dx, dy)
-            # print(id1,id2, distance)
-            if distance < 75.0:
+            #print(id1,id2, distance)
+            if distance < 75.0 and distance > 40.0:
                 if id1 not in red_zone_list:
                     red_zone_list.append(id1)  
                 if id2 not in red_zone_list:
                     red_zone_list.append(id2)
 
         for idx, box in centroid_dict.items():
+            label = box[4]
             if idx in red_zone_list:
-                cv2.rectangle(frame, (box[0],box[1],box[2],box[3]), (0, 0, 255), 2)
+                label = label + ' ( RISK!!! )'
+                cv2.rectangle(frame, (box[0], box[1]), (box[0] + box[2], box[1] + box[3]), (0, 0, 255), 2)
             else:
-                cv2.rectangle(frame, (box[0],box[1],box[2],box[2]), (0, 255, 0), 3)
+                label = label + ' ( SAFE )'
+                cv2.rectangle(frame,(box[0], box[1]), (box[0] + box[2], box[1] + box[3]), (0, 255, 0), 2)
 
+            labelSize, baseLine = cv2.getTextSize(label,cv2.FONT_HERSHEY_SIMPLEX, 0.5,1)
+            cv2.rectangle(frame,(100, 100),(100,50),(255,255,255),cv2.FILLED)
+            cv2.rectangle(frame,(box[0], box[1]-labelSize[1]),(box[0]+labelSize[0],box[1]+baseLine),(255,255,255),cv2.FILLED)
+            cv2.putText(frame,label,(box[0], box[1]), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
+        label = "People at Risk : " + str(len(red_zone_list))
+        cv2.rectangle(frame,(0,0,170,20),(0,0,0),cv2.FILLED)
+        cv2.putText(frame,label,(0, 15), cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255))
 
 
 class ThreadedCamera(object):
@@ -76,13 +85,18 @@ class ThreadedCamera(object):
         self.thread.start()
 
     def update(self):
+        zero = False;
         while True:
             if self.capture.isOpened():
                 (self.status, self.frame) = self.capture.read()
             time.sleep(self.FPS)
+            if(cv2.getWindowProperty('frame', 0) == 0):
+                zero = True
+            if(zero and cv2.getWindowProperty('frame', 0) == -1):
+                break;
 
     def show_frame(self):
-        frame = rescaleFrame(self.frame,.5)
+        frame = rescaleFrame(self.frame)
         detection(frame)
         cv2.imshow('frame', frame)
         cv2.waitKey(self.FPS_MS)
@@ -129,7 +143,7 @@ def convertBack(x, y, w, h):
 
 
 def im():
-    image = cv2.imread('Testing/Picture3.png')
+    image = cv2.imread('Testing/Picture1.jpg')
     image = rescaleFrame(image)
     detection(image)
     cv2.imshow('Image', image)
