@@ -16,7 +16,9 @@ class ImageDetection:
         self.frame = frame
         self.window_self = window_self
         super().__init__()
-        self.net = cv2.dnn_DetectionModel('final.cfg','final.weights')
+        # model =  cv2.dnn.readNet('final.cfg','final_final.weights')
+        # model.setPreferableTarget(cv2.dnn.DNN_TARGET_OPENCL)
+        self.net = cv2.dnn_DetectionModel('final.cfg','final_final.weights')
         self.net.setInputSize(416,416)
         self.net.setInputScale(1.0 / 255)
         self.net.setInputSwapRB(True)
@@ -55,7 +57,7 @@ class ImageDetection:
             for (id1, p1), (id2, p2) in combinations(centroid_dict.items(), 2):
                 dx, dy = ((int(p1[0])-int(p2[0]))**2), ((int(p1[1])-int(p2[1]))**2)
                 distance = self.is_close(dx, dy)
-                if distance < 75.0:
+                if distance < 75.0 and distance > 40.0:
                     if id1 not in red_zone_list:
                         red_zone_list.append(id1)  
                     if id2 not in red_zone_list:
@@ -120,7 +122,7 @@ class Window(QWidget):
     def __init__(self):
         super().__init__()
         self.UI()
-        self.capture = cv2.VideoCapture('Testing/video.mp4')
+        self.capture = cv2.VideoCapture('Testing/vid.mp4')
         self.oldPos = self.pos()
         self.thread = Thread(target = self.vid, args=())
         self.thread.start()
@@ -128,7 +130,7 @@ class Window(QWidget):
     def UI(self):
         flags = QtCore.Qt.WindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
         self.setWindowFlags(flags)
-        self.setGeometry(0, 0, 300, 200)
+        self.setGeometry(300, 300, 300, 0)
         self.setStyleSheet("background-color: black;") 
         self.soc_dis = QLabel('<font></font>',self)
         self.soc_dis.setFont(QFont('Arial', 12)) 
@@ -144,7 +146,6 @@ class Window(QWidget):
         vbox.addStretch()
         vbox.addWidget(self.activities)
         self.setLayout(vbox)
-        vbox.addStretch()
 
     def closeEvent(self):
         self.timer.cancel()

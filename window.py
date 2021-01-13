@@ -12,7 +12,7 @@ import sys
 class ImageDetection:
     def __init__(self, frame):
         # self.label = label
-        self.net = cv2.dnn_DetectionModel('final.cfg','final.weights')
+        self.net = cv2.dnn_DetectionModel('final.cfg','final_final.weights')
         self.net.setInputSize(416,416)
         self.net.setInputScale(1.0 / 255)
         self.net.setInputSwapRB(True)
