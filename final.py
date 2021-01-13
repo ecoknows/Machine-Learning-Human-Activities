@@ -16,7 +16,7 @@ class ImageDetection:
         self.frame = frame
         self.window_self = window_self
         super().__init__()
-        self.net = cv2.dnn_DetectionModel('final.cfg','final.weights')
+        self.net = cv2.dnn_DetectionModel('final.cfg','final_last.weights')
         self.net.setInputSize(416,416)
         self.net.setInputScale(1.0 / 255)
         self.net.setInputSwapRB(True)
@@ -120,7 +120,7 @@ class Window(QWidget):
     def __init__(self):
         super().__init__()
         self.UI()
-        self.capture = cv2.VideoCapture('Testing/video.mp4')
+        self.capture = cv2.VideoCapture('Testing/cam5_orig.mp4')
         self.oldPos = self.pos()
         self.thread = Thread(target = self.vid, args=())
         self.thread.start()
@@ -173,7 +173,7 @@ class Window(QWidget):
         # self.close()
     
     def rescaleFrame(self,frame, scale=0.75):
-        dimension = (600, 400)
+        dimension = (416, 416)
         return cv2.resize(frame, dimension, interpolation=cv2.INTER_AREA)
     
     def mousePressEvent(self, event):
