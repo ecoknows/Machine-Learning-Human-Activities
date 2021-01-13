@@ -55,7 +55,7 @@ class ImageDetection:
             for (id1, p1), (id2, p2) in combinations(centroid_dict.items(), 2):
                 dx, dy = ((int(p1[0])-int(p2[0]))**2), ((int(p1[1])-int(p2[1]))**2)
                 distance = self.is_close(dx, dy)
-                if distance < 75.0:
+                if distance < 75.0 and distance > 40.0:
                     if id1 not in red_zone_list:
                         red_zone_list.append(id1)  
                     if id2 not in red_zone_list:
@@ -128,7 +128,7 @@ class Window(QWidget):
     def UI(self):
         flags = QtCore.Qt.WindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
         self.setWindowFlags(flags)
-        self.setGeometry(0, 0, 300, 200)
+        self.setGeometry(300, 300, 300, 0)
         self.setStyleSheet("background-color: black;") 
         self.soc_dis = QLabel('<font></font>',self)
         self.soc_dis.setFont(QFont('Arial', 12)) 
@@ -144,7 +144,6 @@ class Window(QWidget):
         vbox.addStretch()
         vbox.addWidget(self.activities)
         self.setLayout(vbox)
-        vbox.addStretch()
 
     def closeEvent(self):
         self.timer.cancel()
