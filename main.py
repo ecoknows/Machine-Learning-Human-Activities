@@ -1,159 +1,200 @@
-from threading import Thread
+from PyQt5.QtWidgets import QWidget, QApplication, QLabel, QVBoxLayout, QHBoxLayout
+from PyQt5 import QtCore
+from PyQt5.QtCore import QCoreApplication, QPoint
+from PyQt5.QtGui import QIcon, QFont
+import numpy as np
 import cv2, time
+from threading import Thread
+import math
+import sys 
 from itertools import combinations
 import math
+import glob, os
 
-net = cv2.dnn_DetectionModel('final.cfg','final.weights')
-net.setInputSize(416,416)
-net.setInputScale(1 / 255)
-net.setInputSwapRB(True)
+class ImageDetection:
+    def __init__(self, frame, window_self):
+        # self.label = label
+        self.frame = frame
+        self.window_self = window_self
+        super().__init__()
+        self.net = cv2.dnn_DetectionModel('model.cfg','model.weights')
+        self.net.setInputSize(416,416)
+        self.net.setInputScale(1.0 / 255)
+        self.net.setInputSwapRB(True)
+        self.checkClassesNames()
+        self.detection();
+    
+    def checkClassesNames(self):
+        with open('classes.names','rt') as f:
+            self.names = f.read().rstrip('\n').split('\n')
+    
+    def detection(self):
+        classes, confidences, boxes = self.net.detect(self.frame,confThreshold=0.1,nmsThreshold=0.4)
+        centroid_dict = dict()
+        activities = {}
+        objId = 0
 
-with open('classes.names','rt') as f:
-    names = f.read().rstrip('\n').split('\n')
-
-
-def rescaleFrame(frame, scale=0.75):
-    width = int(frame.shape[1] * scale)
-    height = int(frame.shape[0] * scale)
-    dimension = (width, height)
-
-    return cv2.resize(frame, dimension, interpolation=cv2.INTER_AREA)
-
-def detection(frame):
-    classes, confidences, boxes = net.detect(frame,confThreshold=0.1,nmsThreshold=0.4)
-    centroid_dict = dict()
-    objId = 0
-
-    #if ((classes == ()) == False)
-    if(len(classes) != 0):
-        for classId, confidence, box in zip(classes.flatten(), confidences.flatten(), boxes):
-            label = '%.2f' % confidence
-            label = '%s: %s' % (names[classId], label)
-            # labelSize, baseLine = cv2.getTextSize(label,cv2.FONT_HERSHEY_SIMPLEX, 0.5,1)
-            left, top, width, height = box
-
-            xmin, ymin, xmax, ymax = convertBack(float(left),float(top),float(width),float(height))
-
-            # cv2.rectangle(frame,box,color=(0,255,0), thickness=3)
-            # cv2.rectangle(frame,(left, top-labelSize[1]),(left+labelSize[0],top+baseLine),(255,255,255),cv2.FILLED)
-            # cv2.putText(frame,label,(left, top), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
-            centroid_dict[objId] = (left, top, width, height,label)
-            objId+=1
-
-        red_zone_list = [] 
-        for (id1, p1), (id2, p2) in combinations(centroid_dict.items(), 2):
-            dx, dy = ((int(p1[0])-int(p2[0]))**2), ((int(p1[1])-int(p2[1]))**2)
-            distance = is_close(dx, dy)
-            #print(id1,id2, distance)
-            if distance < 75.0 and distance > 40.0:
-                if id1 not in red_zone_list:
-                    red_zone_list.append(id1)  
-                if id2 not in red_zone_list:
-                    red_zone_list.append(id2)
-
-        for idx, box in centroid_dict.items():
-            label = box[4]
-            if idx in red_zone_list:
-                label = box[4] +  ' [ At Risk ]'
+        #if ((classes == ()) == False)
+        if(len(classes) != 0):
+            for classId, confidence, box in zip(classes.flatten(), confidences.flatten(), boxes):
+                label = '%.2f' % confidence
+                label = '%s: %s' % (self.names[classId], label)
                 labelSize, baseLine = cv2.getTextSize(label,cv2.FONT_HERSHEY_SIMPLEX, 0.5,1)
-                cv2.rectangle(frame, (box[0],box[1],box[2],box[3]), (0, 0, 255), 2)
-                cv2.rectangle(frame,(box[0], box[1]-labelSize[1]),(box[0]+labelSize[0],box[1]+baseLine),(255,255,255),cv2.FILLED)
-                cv2.putText(frame,label,(box[0], box[1]), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
-            else:
-                label = box[4] +  ' [ Safe ]'
+                left, top, width, height = box
+                if activities.get(self.names[classId]) == None:
+                    activities[self.names[classId]] = 1
+                else:
+                    activities[self.names[classId]] += 1
+
+            
+                # cv2.rectangle(self.frame,box,color=(255,0,0), thickness=3)
+                # cv2.rectangle(self.frame,(left, top-labelSize[1]),(left+labelSize[0],top+baseLine),(255,255,255),cv2.FILLED)
+                # cv2.putText(self.frame,label,(left, top), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
+                centroid_dict[objId] = (left, top, width, height, label)
+                objId+=1
+            red_zone_list = [] 
+            for (id1, p1), (id2, p2) in combinations(centroid_dict.items(), 2):
+                dx, dy = ((int(p1[0])-int(p2[0]))**2), ((int(p1[1])-int(p2[1]))**2)
+                distance = self.is_close(dx, dy)
+                if distance < 75.0:#and distance > 40.0:
+                    if id1 not in red_zone_list:
+                        red_zone_list.append(id1)  
+                    if id2 not in red_zone_list:
+                        red_zone_list.append(id2)
+            for idx, box in centroid_dict.items():
+                label = box[4]
+                if idx in red_zone_list:
+                    label = label + ' ( RISK!!! )'
+                    cv2.rectangle(self.frame,(box[0], box[1]), (box[0] + box[2], box[1] + box[3]), (0, 0, 255), 3)
+                else:
+                    label = label + ' ( SAFE )'
+                    cv2.rectangle(self.frame,(box[0], box[1]), (box[0] + box[2], box[1] + box[3]), (0, 255, 0), 3)
+
                 labelSize, baseLine = cv2.getTextSize(label,cv2.FONT_HERSHEY_SIMPLEX, 0.5,1)
-                cv2.rectangle(frame, (box[0],box[1],box[2],box[3]), (0, 255, 0), 2)
-                cv2.rectangle(frame,(box[0], box[1]-labelSize[1]),(box[0]+labelSize[0],box[1]+baseLine),(255,255,255),cv2.FILLED)
-                cv2.putText(frame,label,(box[0], box[1]), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
+                cv2.rectangle(self.frame,(box[0], box[1]-labelSize[1]),(box[0]+labelSize[0],box[1]+baseLine),(255,255,255),cv2.FILLED)
+                cv2.putText(self.frame,label,(box[0], box[1]), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
 
-            labelSize, baseLine = cv2.getTextSize(label,cv2.FONT_HERSHEY_SIMPLEX, 0.5,1)
-            cv2.rectangle(frame,(100, 100),(100,50),(255,255,255),cv2.FILLED)
-            cv2.rectangle(frame,(box[0], box[1]-labelSize[1]),(box[0]+labelSize[0],box[1]+baseLine),(255,255,255),cv2.FILLED)
-            cv2.putText(frame,label,(box[0], box[1]), cv2.FONT_HERSHEY_SIMPLEX,0.5,(0,0,0))
-        label = "People at Risk : " + str(len(red_zone_list))
-        cv2.rectangle(frame,(0,0,170,20),(0,0,0),cv2.FILLED)
-        cv2.putText(frame,label,(0, 15), cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,255,255))
+            risk = '<span style="color:#cd5d7d;">Number of People at Risk : </span><span style="color:white;">'+str(len(red_zone_list))+'</span><br>'
+            safe = '<span style="color:#70af85;">Number of Safe People : </span><span style="color:white">'+ str(len(centroid_dict.items()) - len(red_zone_list))+'</span>'
+            self.window_self.soc_dis.setText(risk+safe)
+            _html = ''
+            color= {
+                'Breastfeeding' : '#6f9eaf',
+                'Bicycling' : '#ffb26b',
+                'Cleaning' : '#f0c38e',
+                'Dancing' : '#ffeebb',
+                'Fishing' : '#d6efc7',
+                'Running' : '#a685e2',
+                'Walking' : '#a3ddcb',
+                'Standing' : '#dfe0df',
+                'Sitting' : '#adeecf',
+                'Chatting' : '#d4e2d4',
+                'Driving' : '#f8f1f1',
+                'Singing' : '#c9cbff',
+                'Swimming' : '#dff3e3',
+                'Washing Hands'  : '#f1ae89',
+                'Cooking' : '#ffe5b9',
+            }
+            for key in activities:
+                _html = _html + '<font color="'+color[key]+'">'+ (str(key) + ' : '+'</font><font color="white">'+  str(activities[key]))+'</font><br>'
+                self.window_self.activities.setText(_html)
+
+    def is_close(self, p1, p2):
+        dst = math.sqrt(p1 + p2)
+        return dst 
+
+    def convertBack(self, x, y, w, h): 
+        xmin = int(round(x - (w / 2)))
+        xmax = int(round(x + (w / 2)))
+        ymin = int(round(y - (h / 2)))
+        ymax = int(round(y + (h / 2)))
+        return xmin, ymin, xmax, ymax
 
 
-class ThreadedCamera(object):
-    def __init__(self, src=0):
-        self.capture = cv2.VideoCapture(src)
-        self.capture.set(cv2.CAP_PROP_BUFFERSIZE, 2)
 
-        # FPS = 1/X
-        # X = desired FPS
-        self.FPS = 1/30
-        self.FPS_MS = int(self.FPS * 1000)
 
-        # Start frame retrieval thread
-        self.thread = Thread(target=self.update, args=())
-        self.thread.daemon = True
+class Window(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.UI()
+        self.oldPos = self.pos()
+        self.thread = Thread(target = self.vid, args=())
         self.thread.start()
 
-    def update(self):
+    def UI(self):
+        flags = QtCore.Qt.WindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(flags)
+        self.setGeometry(300, 300, 300, 300)
+        self.setStyleSheet("background-color: black;") 
+        title_activities = QLabel('Activities Detected',self)
+        title_activities.setFont(QFont('Arial', 12)) 
+        title_activities.setStyleSheet('color: white')
+        self.soc_dis = QLabel('<font></font>',self)
+        self.soc_dis.setFont(QFont('Arial', 12)) 
+        self.activities = QLabel('<font></font>',self)
+        self.activities.setFont(QFont('Arial', 12)) 
+
+        vbox = QVBoxLayout()
+
+        hbox = QHBoxLayout()
+        hbox.addWidget(self.soc_dis)
+        vbox.addLayout(hbox)
+        vbox.addWidget(title_activities)
+        vbox.addWidget(self.activities)
+        self.setLayout(vbox)
+
+    def closeEvent(self):
+        self.timer.cancel()
+
+    def vid(self):
+        self.capture = cv2.VideoCapture('Testing/shopping.mp4')
         zero = False;
-        while True:
-            if self.capture.isOpened():
-                (self.status, self.frame) = self.capture.read()
-            time.sleep(self.FPS)
-            if(cv2.getWindowProperty('frame', 0) == 0):
+        while(True):
+            # Capture frame-by-frame
+            ret, frame = self.capture.read()
+
+            if ret:
+                frame_sized = self.rescaleFrame(frame, .2)
+                ImageDetection(frame_sized, window_self = self)
+                cv2.imshow('Cyclops',frame_sized)
+            
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+            if(cv2.getWindowProperty('Cyclops', 0) == 0):
                 zero = True
-            if(zero and cv2.getWindowProperty('frame', 0) == -1):
+            if(zero and cv2.getWindowProperty('Cyclops', 0) == -1):
                 break;
-
-    def show_frame(self):
-        frame = rescaleFrame(self.frame, .7)
-        detection(frame)
-        cv2.imshow('frame', frame)
-        cv2.waitKey(self.FPS_MS)
-
-
-def vid():
-    if __name__ == '__main__':
-        src = 'Testing/video1.mp4'
-        threaded_camera = ThreadedCamera(src)
-        while True:
-            try:
-                threaded_camera.show_frame()
-            except AttributeError:
-                pass
-
-def is_close(p1, p2):
-    """
-    # 1. Calculate Euclidean Distance of two points    
-    :param:
-    p1, p2 = two points for calculating Euclidean Distance
-
-    :return:
-    dst = Euclidean Distance between two 2d points
-    """
-    dst = math.sqrt(p1 + p2)
-    return dst 
-
-def convertBack(x, y, w, h): 
-    """
-    # 2. Converts center coordinates to rectangle coordinates
-    :param:
-    x, y = midpoint of bounding box
-    w, h = width, height of the bounding box
+        self.capture.release()
+        cv2.destroyAllWindows()
+        self.close()
     
-    :return:
-    xmin, ymin, xmax, ymax
-    """
-    xmin = int(round(x - (w / 2)))
-    xmax = int(round(x + (w / 2)))
-    ymin = int(round(y - (h / 2)))
-    ymax = int(round(y + (h / 2)))
-    return xmin, ymin, xmax, ymax
+    def rescaleFrame(self,frame, scale=0.75):
+        dimension = (600, 400)
+        return cv2.resize(frame, dimension, interpolation=cv2.INTER_AREA)
+    
+    def mousePressEvent(self, event):
+        self.oldPos = event.globalPos()
 
+    def mouseMoveEvent(self, event):
+        delta = QPoint (event.globalPos() - self.oldPos)
+        #print(delta)
+        self.move(self.x() + delta.x(), self.y() + delta.y())
+        self.oldPos = event.globalPos()
 
+    def image(self):
+        for file in glob.glob('Testing\images\*.jpg'):
+            img = cv2.imread(file)
+            img_resize = self.rescaleFrame(img)
+            ImageDetection(img_resize,window_self = self)
+            cv2.imshow('Cyclops', img_resize)
+            cv2.waitKey(0)
+            cv2.destroyAllWindows()
+        self.close()
 
-def im():
-    image = cv2.imread('Testing/Picture3.png')
-    image = rescaleFrame(image,1.5)
-    detection(image)
-    cv2.imshow('Image', image)
-    cv2.waitKey(0)
-
-# im()
-vid()
+    
+  
+if __name__=="__main__":
+    app = QApplication(sys.argv)
+    window = Window()
+    window.show()
+    sys.exit(app.exec_())
